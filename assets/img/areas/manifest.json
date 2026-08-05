@@ -1,0 +1,10 @@
+{
+  "areas": {
+    "cardio": "assets/img/areas/cardio.jpg",
+    "nutricion": "assets/img/areas/nutricion.jpg",
+    "sueno": "assets/img/areas/sueno.jpg",
+    "mente": "assets/img/areas/mente.jpg",
+    "fuerza": "assets/img/areas/fuerza.jpg",
+    "longevidad": "assets/img/areas/longevidad.jpg"
+  }
+}
