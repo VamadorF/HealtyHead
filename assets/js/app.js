@@ -148,6 +148,7 @@ function viewHome() {
 
   const entradas = [
     { t: "Áreas de salud", d: "Guías clínicas completas por sistema.", h: "#/areas", i: "areas" },
+    { t: "Entrenar", d: "Plan semanal, sesión guiada, PRs y peso.", h: "#/entrenar", i: "fuerza" },
     { t: "Ejercicios", d: "Biblioteca ilustrada por grupo muscular.", h: "#/ejercicios", i: "ejercicio" },
     { t: "Tier list", d: "Qué priorizar según evidencia e impacto.", h: "#/tierlist", i: "tier" },
     { t: "Herramientas", d: "Calculadoras: IMC, calorías, sueño y más.", h: "#/herramientas", i: "tool" },
@@ -163,7 +164,8 @@ function viewHome() {
       estrategias, la valoración de sus especialistas y una clasificación por nivel de evidencia. Empieza
       por lo que de verdad reduce el riesgo.</p>
       <div class="hero-cta">
-        <a class="btn primary" href="#/areas">Explorar áreas</a>
+        <a class="btn primary" href="#/entrenar">Entrenar hoy</a>
+        <a class="btn" href="#/areas">Explorar áreas</a>
         <a class="btn" href="#/herramientas">Herramientas</a>
       </div>
     </section>
@@ -637,21 +639,25 @@ function calcCintura() {
 
 /* ---------- BIBLIOTECA DE EJERCICIOS ---------- */
 function viewEjercicios() {
-  const chips = GYM_GRUPOS.map((g, i) => `<button class="ex-filter ${i === 0 ? "active" : ""}" data-grupo="${g.id}">${g.n}</button>`).join("");
+  const chips = [`<button class="ex-filter active" data-grupo="">Todos</button>`]
+    .concat(GYM_GRUPOS.map((g) => `<button class="ex-filter" data-grupo="${g.id}">${g.n}</button>`)).join("");
   return `
     <div class="crumbs"><a href="#/">Inicio</a><span class="sep">›</span>Ejercicios</div>
     <section class="guide-hero">
       <div class="gh-pad">
         <div class="gh-type">Kinesiología · Preparación física</div>
         <h1>Biblioteca de ejercicios</h1>
-        <p class="gh-lema" style="font-style:normal;color:var(--text-dim)">Más de 1.300 ejercicios con <b>animación del movimiento</b> e instrucciones paso a paso en español. El terreno donde brillan
-        <a href="#/especialistas">kinesiólogos y preparadores físicos</a>: técnica correcta, músculos implicados y material necesario.</p>
-        <div class="gh-byline"><span>Ligada a la guía de <a href="#/area/fuerza">Fuerza y Movilidad</a></span></div>
+        <p class="gh-lema" style="font-style:normal;color:var(--text-dim)">1.324 ejercicios con <b>animación del movimiento</b> e instrucciones en español. Filtra por lo que tienes: las combinaciones sin resultados desaparecen.</p>
+        <div class="gh-byline"><span>Ligada a la guía de <a href="#/area/fuerza">Fuerza y Movilidad</a> y a <a href="#/entrenar">Entrenar</a></span></div>
       </div>
     </section>
 
-    <div class="caps-head">Elige un grupo muscular</div>
+    <div class="field" style="max-width:360px;margin-bottom:12px"><label>Buscar</label>
+      <input id="exSearch" type="search" placeholder="plank, press, zancada…"></div>
+    <div class="caps-head">Grupo muscular</div>
     <div class="ex-filters" id="exFilters">${chips}</div>
+    <div class="caps-head">Material (se adapta a lo elegido)</div>
+    <div class="ex-filters" id="exEquip"></div>
     <div id="exResults"></div>
   `;
 }
@@ -673,28 +679,58 @@ function exCard(e) {
     </div>
   </div>`;
 }
+let exState = { grupo: "", q: "", equipo: [] };
 function initEjercicios() {
   const bar = document.getElementById("exFilters");
   if (!bar) return;
+  exState = { grupo: "", q: "", equipo: [] };
   bar.querySelectorAll(".ex-filter").forEach((btn) => btn.addEventListener("click", () => {
     bar.querySelectorAll(".ex-filter").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    loadEjercicios(btn.dataset.grupo);
+    exState.grupo = btn.dataset.grupo || "";
+    exState.equipo = [];
+    loadEjercicios();
   }));
-  loadEjercicios(GYM_GRUPOS[0].id);
+  const search = document.getElementById("exSearch");
+  let t;
+  search?.addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(() => { exState.q = search.value.trim(); loadEjercicios(); }, 200);
+  });
+  loadEjercicios();
 }
-async function loadEjercicios(grupo) {
+async function loadEjercicios() {
   const box = document.getElementById("exResults");
   if (!box) return;
   box.innerHTML = `<div class="loader"><div class="spin"></div><div style="margin-top:10px">Cargando ejercicios…</div></div>`;
   try {
-    const res = await fetch(`${API.gym}?grupo=${encodeURIComponent(grupo)}&limit=24`);
+    const params = new URLSearchParams({ catalog: "1", limit: "48" });
+    if (exState.grupo) params.set("grupo", exState.grupo);
+    if (exState.q) params.set("q", exState.q);
+    if (exState.equipo.length) params.set("equipo", exState.equipo.join(","));
+    const res = await fetch(`${API.gym}?${params.toString()}`);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const items = data.items || [];
-    if (!items.length) { box.innerHTML = `<div class="disclaimer-inline">No se han encontrado ejercicios para este grupo.</div>`; return; }
+    const eqBar = document.getElementById("exEquip");
+    if (eqBar) {
+      const counts = data.equipo_counts || {};
+      items.forEach((e) => { if (!counts[e.equipo]) counts[e.equipo] = (counts[e.equipo] || 0) + 1; });
+      const chips = Object.keys(counts).sort().map((eq) => {
+        const on = exState.equipo.indexOf(eq) >= 0;
+        return `<button class="ex-filter ${on ? "active" : ""}" data-eq="${eq}">${esWord(EQUIP_ES, eq)} · ${counts[eq]}</button>`;
+      }).join("");
+      eqBar.innerHTML = chips || `<span class="tr-muted">Sin material compatible con este filtro.</span>`;
+      eqBar.querySelectorAll("[data-eq]").forEach((btn) => btn.addEventListener("click", () => {
+        const eq = btn.dataset.eq;
+        const i = exState.equipo.indexOf(eq);
+        if (i >= 0) exState.equipo.splice(i, 1); else exState.equipo.push(eq);
+        loadEjercicios();
+      }));
+    }
+    if (!items.length) { box.innerHTML = `<div class="disclaimer-inline">No hay ejercicios para esta combinación. Quita un filtro: las opciones se recortan para no dejarte en cero.</div>`; return; }
     box.innerHTML = `<div class="ex-grid">${items.map(exCard).join("")}</div>
-      <div class="disclaimer-inline">${data.total} ejercicios en este grupo. Animaciones e instrucciones de <b>Gym Visual</b>, vía el dataset abierto <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">hasaneyldrm/exercises-dataset</a> (instrucciones bajo licencia MIT). Ejecuta cada movimiento con buena técnica; ante dudas o molestias, consulta con un kinesiólogo o preparador físico.</div>`;
+      <div class="disclaimer-inline">${data.total} ejercicios (dataset local: ${data.count || 1324} con GIF). Animaciones de <b>Gym Visual</b> vía <a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">hasaneyldrm/exercises-dataset</a> (MIT). <a href="#/entrenar">Añádelos a tu plan →</a></div>`;
     initReveal();
   } catch (err) {
     box.innerHTML = `<div class="notfound"><h3 class="font-head" style="margin:0 0 8px">No se pudieron cargar los ejercicios</h3>
@@ -959,13 +995,16 @@ function viewNotFound() {
 function router() {
   const raw = location.hash.replace(/^#\/?/, "");
   const [path, anchor] = raw.split("#");
-  const [route, param] = path.split("/");
-  let html, needsFetch = false, needsTierInit = false, needsEjInit = false, needsNewsInit = false;
+  const parts = path.split("/").filter(Boolean);
+  const route = parts[0] || "";
+  const param = parts[1];
+  let html, needsFetch = false, needsTierInit = false, needsEjInit = false, needsNewsInit = false, needsTrain = false;
   switch (route) {
     case "": html = viewHome(); break;
     case "areas": html = viewAreas(); break;
     case "area": html = viewArea(param); break;
     case "objetivo": html = viewObjetivo(param); break;
+    case "entrenar": html = TrainUI.render(parts.slice(1)); needsTrain = true; break;
     case "ejercicios": html = viewEjercicios(); needsEjInit = true; break;
     case "noticias": html = viewNoticias(); needsNewsInit = true; break;
     case "tierlist": html = viewTierList(); needsTierInit = true; break;
@@ -993,6 +1032,7 @@ function router() {
   if (needsTierInit) initTierFilters();
   if (needsEjInit) initEjercicios();
   if (needsNewsInit) initNoticias();
+  if (needsTrain) TrainUI.mount();
   if (route === "") loadNoticias("general", "homeNews", 5, "es");
   if (route === "area" && area(param)) loadNoticias(param, "areaNews", 4, "es");
 
@@ -1008,6 +1048,7 @@ function toggleEmb() {
 
 function setActiveNav(route) {
   const map = { "": "#/", areas: "#/areas", area: "#/areas", objetivo: "#/areas",
+    entrenar: "#/entrenar",
     ejercicios: "#/ejercicios", noticias: "#/noticias", tierlist: "#/tierlist", herramientas: "#/herramientas",
     articulos: "#/articulos", articulo: "#/articulos",
     recomendaciones: "#/recomendaciones", cheatsheet: "#/cheatsheet", especialistas: "#/especialistas" };
@@ -1082,6 +1123,9 @@ function buildSearchIndex() {
   DB.articulos.forEach((art) => idx.push({ tipo: "Artículo", nombre: art.titulo, area: art.area, href: `#/articulo/${art.id}` }));
   Object.entries(DB.especialistas).forEach(([, e]) => idx.push({ tipo: "Especialidad", nombre: e.nombre, area: null, href: `#/especialistas` }));
   idx.push({ tipo: "Herramientas", nombre: "Calculadoras de salud (IMC, calorías, sueño)", area: null, href: "#/herramientas" });
+  idx.push({ tipo: "Entrenar", nombre: "Plan semanal y sesión guiada", area: "fuerza", href: "#/entrenar" });
+  idx.push({ tipo: "Entrenar", nombre: "Peso corporal y objetivo", area: "fuerza", href: "#/entrenar/peso" });
+  idx.push({ tipo: "Entrenar", nombre: "PRs, 1RM y mapa muscular", area: "fuerza", href: "#/entrenar/stats" });
   idx.push({ tipo: "Ejercicios", nombre: "Biblioteca de ejercicios por grupo muscular", area: "fuerza", href: "#/ejercicios" });
   return idx;
 }

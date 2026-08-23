@@ -132,9 +132,12 @@ class Handler(SimpleHTTPRequestHandler):
     def gym(self, query):
         params = dict(urllib.parse.parse_qsl(query))
         grupo = params.get("grupo", "")
+        equipo = params.get("equipo", "")
         q = params.get("q", "").strip().lower()
+        catalog = params.get("catalog") == "1"
+        ids = {x for x in params.get("ids", "").split(",") if x}
         try:
-            limit = min(int(params.get("limit", 24)), 60)
+            limit = min(int(params.get("limit", 24)), 1400)
         except ValueError:
             limit = 24
         try:
@@ -146,11 +149,38 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             return self._json(500, {"error": str(exc)})
         items = data
+        if ids:
+            items = [x for x in items if x.get("id") in ids]
         if grupo:
             items = [x for x in items if x.get("grupo") == grupo]
+        if equipo:
+            wanted = {e.strip() for e in equipo.split(",") if e.strip()}
+            items = [x for x in items if x.get("equipo") in wanted]
         if q:
-            items = [x for x in items if q in (x.get("name") or "").lower()]
-        self._json(200, {"total": len(items), "items": items[offset:offset + limit]})
+            items = [x for x in items if q in (x.get("name") or "").lower()
+                     or q in (x.get("target") or "").lower()
+                     or q in (x.get("equipo") or "").lower()]
+        from collections import Counter
+        eq_counts = Counter(x.get("equipo") for x in items if x.get("equipo"))
+        if catalog:
+            items = [{
+                "id": x.get("id"),
+                "name": x.get("name"),
+                "grupo": x.get("grupo"),
+                "equipo": x.get("equipo"),
+                "target": x.get("target"),
+                "sec": x.get("sec") or [],
+                "gif": x.get("gif"),
+                "pasos": x.get("pasos") or [],
+            } for x in items]
+        equipos = sorted({x.get("equipo") for x in data if x.get("equipo")})
+        self._json(200, {
+            "total": len(items),
+            "items": items[offset:offset + limit],
+            "equipos": equipos,
+            "equipo_counts": dict(eq_counts),
+            "count": len(data),
+        })
 
     def noticias(self, query):
         params = dict(urllib.parse.parse_qsl(query))
