@@ -164,7 +164,7 @@ const TrainUI = (() => {
             <div class="tr-muted">${r.items.length} ejercicios · ${Train.PROGRESSION_TYPES[r.progression?.type]?.name || "Lineal"}</div></div>
           <a class="btn" href="#/entrenar/rutina/${esc(r.id)}">Editar</a>
           <button class="btn" onclick="TrainUI.delRoutine('${esc(r.id)}')">Borrar</button>
-        </div>`).join("") : `<div class="tr-empty">No hay rutinas todavía.</div>`}
+        </div>`).join("") : `<div class="tr-empty">No hay rutinas todavía.</div>`}</div>
     `;
   }
 
@@ -1085,3 +1085,4 @@ const TrainUI = (() => {
     downloadPlan, printPlan, importPlan, muscleMaps, catalogSize: () => catalog.length,
   };
 })();
+if (typeof globalThis !== "undefined") globalThis.TrainUI = TrainUI;
