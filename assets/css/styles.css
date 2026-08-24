@@ -512,7 +512,7 @@ a.chip:hover { border-color: var(--brand-2); color: var(--ink); text-decoration:
 .feat-slide .fs-ex { color: var(--text-dim); font-size: 13.5px; }
 
 /* ---------- ENTRADAS (accesos) ---------- */
-.entry-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.entry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 860px) { .entry-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 460px) { .entry-grid { grid-template-columns: 1fr; } }
 .entry-card { display: flex; flex-direction: column; gap: 6px; padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); transition: .12s; }
