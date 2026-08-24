@@ -14,9 +14,11 @@ python server.py
 
 Luego abre **http://127.0.0.1:8899** en tu navegador.
 
-> También puedes abrir `index.html` directamente, pero entonces la sección
-> **"Mis recomendaciones"** no podrá consultar la API en vivo (por CORS). El
-> `server.py` incluye un pequeño proxy que resuelve ese problema.
+> También puedes abrir `index.html` directamente. La **biblioteca de ejercicios**
+> carga `data/gym_exercises.json` en el cliente (funciona en Vercel y en cualquier
+> hosting estático). **"Mis recomendaciones"** y **Noticias** sí necesitan un
+> proxy para evitar CORS: `python server.py` en local, o las funciones de
+> `/api` si despliegas en Vercel.
 
 ## Qué incluye
 
@@ -35,10 +37,24 @@ Luego abre **http://127.0.0.1:8899** en tu navegador.
 ```
 index.html          # Shell + navegación
 server.py           # Servidor estático + proxy a la API real (evita CORS)
+api/                # Funciones serverless para Vercel (/api/gym, noticias, recomendaciones)
+data/gym_exercises.json  # Dataset local de la biblioteca (1.324 ejercicios)
 assets/css/styles.css
-assets/js/data.js    # "Base de datos": áreas, guías, builds, artículos, tiers
-assets/js/app.js     # Router SPA + render + integración con la API
+assets/js/data.js        # "Base de datos": áreas, guías, builds, artículos, tiers
+assets/js/gym-catalog.js # Carga y filtro del dataset (sin depender de Python)
+assets/js/app.js         # Router SPA + render + integración con la API
+vercel.json              # Cabeceras y empaquetado del dataset para Vercel
 ```
+
+## Despliegue en Vercel
+
+El sitio es estático: Vercel sirve `index.html`, `assets/` y `data/`. La biblioteca
+de ejercicios **no necesita Python**; lee `data/gym_exercises.json` en el navegador
+y, además, existe `api/gym.js` por si alguien llama a `/api/gym`.
+
+Las rutas `/api/noticias` y `/api/recomendaciones` son funciones serverless (proxy
+RSS y MyHealthfinder). Tras un deploy, abre `#/ejercicios` y confirma que aparecen
+los GIF; un 404 en `/api/gym` ya no deja la biblioteca en blanco.
 
 ## Aviso
 
