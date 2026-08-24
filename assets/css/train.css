@@ -133,6 +133,8 @@
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px;
 }
 .tr-itemrow.ss { border-left: 3px solid var(--gold); }
+a.tr-itemrow { text-decoration: none; color: inherit; }
+a.tr-itemrow:hover { border-color: var(--brand); text-decoration: none; }
 
 .tr-empty { padding: 22px; text-align: center; color: var(--text-dim); border: 1px dashed var(--border); border-radius: var(--radius); }
 
@@ -144,6 +146,76 @@
 .tr-badge.brand { color: var(--brand); }
 
 .tr-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.tr-hero { padding: 8px 0 18px; }
+.tr-hero h1 { margin: 4px 0 6px; font-size: 32px; color: var(--ink); }
+.tr-hero p { margin: 0; color: var(--text-dim); }
+.tr-kicker {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--brand);
+}
+.tr-cta { padding: 12px 22px; font-size: 15px; margin-top: 14px; display: inline-flex; }
+.tr-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.tr-textbtn {
+  background: none; border: 0; color: var(--text-dim); cursor: pointer;
+  font: inherit; padding: 4px 0;
+}
+.tr-textbtn:hover { color: var(--ink); }
+.tr-subnav a.live { background: var(--brand-soft); color: var(--brand); }
+.tr-week-compact { margin: 8px 0 18px; }
+.tr-week-compact .tr-day {
+  text-decoration: none; color: inherit; min-height: 88px; padding: 10px;
+}
+.tr-week-compact .tr-day:hover { border-color: var(--brand); text-decoration: none; }
+.tr-week-compact .td-r { font-size: 12px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.tr-kpi-quiet { margin: 4px 0 18px; }
+.tr-kpi-quiet a { text-decoration: none; color: inherit; }
+.tr-day-go { font-weight: 700; color: var(--ink); text-decoration: none; font-size: 13px; }
+.tr-day-tools input[type="date"] {
+  width: 100%; font-size: 11px; background: var(--input-bg); color: var(--text-dim);
+  border: 1px dashed var(--border); border-radius: var(--radius); padding: 4px;
+}
+.tr-split { display: grid; grid-template-columns: 1.4fr .8fr; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .tr-split { grid-template-columns: 1fr; } }
+.tr-aside { position: sticky; top: 64px; }
+.tr-session-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.tr-bwbar {
+  display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; margin-bottom: 12px;
+}
+.tr-bwbar label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-dim); }
+.tr-bwbar input { width: 110px; }
+.tr-sticky-end { position: sticky; bottom: 8px; background: var(--bg); padding: 8px 0; }
+.tr-maps {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  background: #0e1014; border: 1px solid var(--border); border-radius: 8px; padding: 8px;
+}
+@media (max-width: 760px) { .tr-maps { grid-template-columns: 1fr; } }
+.tr-mapcard { margin: 0; }
+.tr-mapcard figcaption {
+  text-align: center; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-faint); margin-bottom: 4px;
+}
+.tr-mm { width: 100%; height: auto; display: block; max-height: 520px; }
+.tr-mm-photo { filter: grayscale(1) contrast(1.05) brightness(.92); opacity: .55; }
+:root[data-theme="light"] .tr-maps { background: #e8ece8; }
+:root[data-theme="light"] .tr-mm-photo { filter: grayscale(1) contrast(1.02) brightness(1.05); opacity: .5; }
+.tr-mm-m { transition: fill .2s ease, fill-opacity .2s ease; cursor: default; }
+.tr-mm-m:hover { filter: brightness(1.15); }
+.tr-resting { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tr-resting span {
+  font-size: 11px; color: var(--text-faint); border: 1px solid var(--border);
+  border-radius: 99px; padding: 2px 8px;
+}
+.tr-prstrip {
+  display: flex; gap: 12px; overflow: auto; margin: 14px 0;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;
+}
+.tr-prstrip div { min-width: 90px; }
+.tr-prstrip b { display: block; color: var(--brand); font-family: var(--font-head); font-size: 18px; }
+.tr-prstrip span { font-size: 11px; color: var(--text-dim); }
+.tr-mapwrap { margin: 8px 0 16px; }
 
 :root[data-theme="light"] .tr-pick img, :root[data-theme="light"] .tr-ex-h img { background: #fff; }
 

@@ -74,6 +74,10 @@ vm.createContext(sandbox);
 
 const domainSrc = fs.readFileSync(path.join(__dirname, "../assets/js/train-domain.js"), "utf8");
 vm.runInContext(domainSrc, sandbox);
+const bodiesSrc = fs.readFileSync(path.join(__dirname, "../assets/vendor/musclemap/bodies.js"), "utf8");
+vm.runInContext(bodiesSrc, sandbox);
+const mapSrc = fs.readFileSync(path.join(__dirname, "../assets/js/muscle-map.js"), "utf8");
+vm.runInContext(mapSrc, sandbox);
 const uiSrc = fs.readFileSync(path.join(__dirname, "../assets/js/train-ui.js"), "utf8");
 vm.runInContext(uiSrc, sandbox);
 
@@ -119,6 +123,8 @@ function get(url) {
     ["biblioteca"],
     ["compartir"],
     ["ajustes"],
+    ["progreso"],
+    ["mas"],
   ];
   screens.forEach((parts) => {
     const html = TrainUI.render(parts);
@@ -133,7 +139,7 @@ function get(url) {
 
   const plan = TrainUI.render(["plan"]);
   assert.ok(plan.indexOf("Plan semanal") >= 0);
-  assert.ok(plan.indexOf("Mover este día") >= 0);
+  assert.ok(plan.indexOf('type="date"') >= 0);
 
   Train.addWeighIn(80, "2026-08-01");
   Train.addWeighIn(79, "2026-08-10");
@@ -146,6 +152,12 @@ function get(url) {
   assert.ok(stats.indexOf("1RM") >= 0);
   assert.ok(stats.indexOf("Mapa muscular") >= 0);
   assert.ok(stats.indexOf("tr-heat") >= 0);
+  assert.ok(stats.indexOf("tr-mm") >= 0);
+  assert.ok(stats.indexOf("male-front.webp") >= 0 || stats.indexOf("female-front.webp") >= 0);
+
+  const prog = TrainUI.render(["progreso"]);
+  assert.ok(prog.indexOf("Mapa muscular") >= 0);
+  assert.ok(prog.indexOf("tr-mm") >= 0);
 
   const share = TrainUI.render(["compartir"]);
   assert.ok(share.indexOf("healthyhead-plan") >= 0 || share.indexOf("weeklyPlan") >= 0);

@@ -37,12 +37,20 @@ const TrainUI = (() => {
   function lib() { return Train.allExercises(catalog); }
 
   function subnav(active) {
+    const s = Train.getState();
+    const live = !!(s.activeSession);
+    const key = (!active || active === "sesion") ? "" :
+      (active === "rutina" || active === "plan") ? "plan" :
+      (active === "stats" || active === "peso" || active === "progreso") ? "progreso" :
+      (["biblioteca", "compartir", "ajustes", "mas"].indexOf(active) >= 0) ? "mas" : active;
     const links = [
-      ["", "Hoy"], ["plan", "Plan"], ["sesion", "Sesión"], ["peso", "Peso"],
-      ["stats", "Estadísticas"], ["biblioteca", "Biblioteca"], ["compartir", "Compartir"], ["ajustes", "Ajustes"],
+      ["", live ? "Entrenando" : "Hoy"],
+      ["plan", "Semana"],
+      ["progreso", "Progreso"],
+      ["mas", "Más"],
     ];
     return `<nav class="tr-subnav">${links.map(([id, n]) =>
-      `<a href="#/entrenar${id ? "/" + id : ""}" class="${active === id ? "active" : ""}">${n}</a>`).join("")}</nav>`;
+      `<a href="#/entrenar${id ? "/" + id : ""}" class="${key === id ? "active" : ""} ${id === "" && live ? "live" : ""}">${n}</a>`).join("")}</nav>`;
   }
 
   function wrap(active, inner) {
@@ -56,14 +64,18 @@ const TrainUI = (() => {
     Train.load();
     const p = (parts && parts[0]) || "";
     const id = parts && parts[1];
+    const live = !!Train.getState().activeSession;
     if (p === "plan") return wrap("plan", viewPlan());
     if (p === "rutina") return wrap("plan", viewRoutine(id));
     if (p === "sesion") return wrap("sesion", viewSession(id));
     if (p === "peso") return wrap("peso", viewWeight());
     if (p === "stats") return wrap("stats", viewStats());
+    if (p === "progreso") return wrap("progreso", viewProgress());
     if (p === "biblioteca") return wrap("biblioteca", viewLibrary());
     if (p === "compartir") return wrap("compartir", viewShare());
     if (p === "ajustes") return wrap("ajustes", viewSettings());
+    if (p === "mas") return wrap("mas", viewMore());
+    if (live && !p) return wrap("", viewSession());
     return wrap("", viewDash());
   }
 
@@ -72,100 +84,83 @@ const TrainUI = (() => {
     const week = Train.weekDates();
     const today = week.find((d) => d.isToday) || week[0];
     const routine = today.routineId ? Train.getRoutine(today.routineId) : null;
-    const nWo = s.workouts.length;
     const last = s.weighIns[s.weighIns.length - 1];
-    const hm = Train.heatmap(new Date().getFullYear());
-    const trained = hm.cells.filter((c) => c.minutes > 0).length;
+    const nWo = s.workouts.length;
     return `
-      <section class="guide-hero">
-        <div class="gh-pad">
-          <div class="gh-type">Entrenamiento · Fuerza y movilidad</div>
-          <h1>Tu semana, tus series, tu progreso</h1>
-          <p class="gh-lema" style="font-style:normal;color:var(--text-dim)">Planifica, entrena con guía y mira cómo evolucionan tus marcas. La biblioteca tiene <b>${catalog.length || "1.324"}</b> ejercicios con demostración animada.</p>
-        </div>
-      </section>
-      <div class="tr-dash">
-        <div class="tr-card">
-          <h3>Hoy · ${today.name} ${Train.formatDateES(today.iso)}</h3>
-          ${routine ? `<p>Toca <b>${esc(routine.name)}</b> · ${routine.items.length} ejercicios</p>
-            <div class="tr-actions"><a class="btn primary" href="#/entrenar/sesion">Empezar sesión de hoy</a>
-            <a class="btn" href="#/entrenar/plan">Reprogramar</a></div>`
-          : `<p class="tr-muted">No hay rutina asignada a hoy. Asigna una en el plan semanal o empieza una sesión libre.</p>
-            <div class="tr-actions"><a class="btn primary" href="#/entrenar/plan">Planificar la semana</a>
-            <button class="btn" onclick="TrainUI.freeSession()">Sesión libre</button></div>`}
-        </div>
-        <div class="tr-card">
-          <h3>Resumen</h3>
-          <div class="tr-kpi">
-            <span><b>${nWo}</b>entrenos guardados</span>
-            <span><b>${trained}</b>días activos este año</span>
-            <span><b>${last ? Train.trimNum(last.kg) + " kg" : "—"}</b>último peso</span>
-          </div>
-          <div class="tr-actions">
-            <a class="btn" href="#/entrenar/peso">Registrar peso</a>
-            <a class="btn" href="#/entrenar/stats">PRs y mapa muscular</a>
-          </div>
-        </div>
+      <div class="tr-hero">
+        ${routine ? `
+          <div class="tr-kicker">${today.name}</div>
+          <h1>${esc(routine.name)}</h1>
+          <p>${routine.items.length} ejercicios</p>
+          <a class="btn primary tr-cta" href="#/entrenar/sesion">Empezar sesión</a>`
+        : `
+          <div class="tr-kicker">${today.name}</div>
+          <h1>Descanso</h1>
+          <p>Hoy no hay rutina. Elige un día de la semana o arma un plan.</p>
+          <div class="tr-actions" style="margin-top:14px">
+            <a class="btn primary" href="#/entrenar/plan">Semana</a>
+            ${s.routines.length ? `<button class="btn" onclick="TrainUI.freeSession()">Sesión libre</button>`
+              : `<button class="btn" onclick="TrainUI.seedTemplate()">Full body</button>`}
+          </div>`}
       </div>
-      <div class="caps-head">Esta semana</div>
       ${weekStrip(week)}
-      ${s.routines.length ? "" : `<div class="tr-empty" style="margin-top:14px">Aún no tienes rutinas.
-        <div class="tr-actions" style="justify-content:center"><button class="btn primary" onclick="TrainUI.seedTemplate()">Crear plantilla Full body</button>
-        <a class="btn" href="#/entrenar/plan">Crear rutina vacía</a></div></div>`}
+      <div class="tr-kpi tr-kpi-quiet">
+        <a href="#/entrenar/progreso"><b>${nWo}</b>entrenos</a>
+        <a href="#/entrenar/peso"><b>${last ? Train.trimNum(last.kg) + " kg" : "—"}</b>peso</a>
+      </div>
+      ${s.routines.length ? "" : `<div class="tr-empty">Sin rutinas todavía.
+        <div class="tr-actions" style="justify-content:center;margin-top:10px">
+          <button class="btn primary" onclick="TrainUI.seedTemplate()">Full body</button>
+        </div></div>`}
     `;
   }
 
   function weekStrip(week) {
-    return `<div class="tr-week">${week.map((d) => {
+    return `<div class="tr-week tr-week-compact">${week.map((d) => {
       const r = d.routineId ? Train.getRoutine(d.routineId) : null;
+      const href = r ? `#/entrenar/sesion/${d.iso}` : "#/entrenar/plan";
       const moved = d.override && d.override.from;
       const vacated = d.override && d.override.vacated;
-      return `<div class="tr-day ${d.isToday ? "today" : ""} ${vacated ? "vacated" : ""}">
-        <div class="td-name">${d.name}${d.isToday ? " · hoy" : ""}</div>
+      return `<a class="tr-day ${d.isToday ? "today" : ""} ${vacated ? "vacated" : ""} ${r ? "has" : ""}" href="${href}">
+        <div class="td-name">${d.name.slice(0, 3)}</div>
         <div class="td-iso">${Train.formatDateES(d.iso)}</div>
-        <div>${r ? `<b><a href="#/entrenar/sesion/${d.iso}">${esc(r.name)}</a></b>` : "<span class='tr-muted'>Descanso</span>"}</div>
-        ${moved ? `<div class="tr-moved">Movido desde ${Train.formatDateES(d.override.from)}</div>` : ""}
-        ${vacated ? `<div class="tr-moved">Reprogramado a ${Train.formatDateES(d.override.to)}</div>` : ""}
-      </div>`;
+        <div class="td-r">${r ? esc(r.name) : "—"}</div>
+        ${moved ? `<div class="tr-moved">desde ${Train.formatDateES(d.override.from)}</div>` : ""}
+      </a>`;
     }).join("")}</div>`;
   }
 
   function viewPlan() {
     const s = Train.getState();
     const week = Train.weekDates();
-    const optsFor = (selected) => `<option value="">— Descanso —</option>` + s.routines.map((r) =>
+    const optsFor = (selected) => `<option value="">Descanso</option>` + s.routines.map((r) =>
       `<option value="${esc(r.id)}" ${r.id === selected ? "selected" : ""}>${esc(r.name)}</option>`).join("");
     return `
-      <h2 class="section-title">Plan semanal</h2>
-      <p class="section-sub">Una rutina por día. Reprogramar mueve solo esa fecha: el plan base no cambia.</p>
-      <div class="tr-actions" style="margin-top:0">
-        <button class="btn primary" onclick="TrainUI.newRoutine()">Nueva rutina</button>
-        <button class="btn" onclick="TrainUI.seedTemplate()">Plantilla Full body</button>
+      <div class="tr-toolbar">
+        <h2 class="section-title" style="margin:0">Plan semanal</h2>
+        <div class="tr-actions" style="margin:0">
+          <button class="btn" onclick="TrainUI.newRoutine()">Nueva</button>
+          ${s.routines.some((r) => r.name === "Full body A") ? "" : `<button class="btn" onclick="TrainUI.seedTemplate()">Full body</button>`}
+        </div>
       </div>
-      <div class="caps-head">Esta semana</div>
       <div class="tr-week">${week.map((d) => {
         const r = d.routineId ? Train.getRoutine(d.routineId) : null;
-        return `<div class="tr-day ${d.isToday ? "today" : ""}">
-          <div class="td-name">${d.name}</div>
-          <div class="td-iso">${d.iso}</div>
-          <label class="tr-muted">Plan base</label>
-          <select onchange="TrainUI.setDay('${d.key}', this.value)">${optsFor(s.weeklyPlan[d.key])}</select>
-          <div>${r ? `<a href="#/entrenar/rutina/${esc(d.routineId)}">${esc(r.name)}</a>` : "<span class='tr-muted'>Sin sesión</span>"}</div>
-          ${d.override ? `<div class="tr-moved">${d.override.vacated ? "Vacío (movido)" : "Excepción este día"}</div>
-            <button class="btn" onclick="TrainUI.clearOv('${d.iso}')">Quitar excepción</button>` : ""}
-          ${r ? `<button class="btn primary" onclick="TrainUI.begin('${d.iso}')">${d.isToday ? "Entrenar hoy" : "Entrenar este día"}</button>` : ""}
-          <button class="btn" onclick="TrainUI.askReschedule('${d.iso}')">Mover este día</button>
+        return `<div class="tr-day ${d.isToday ? "today" : ""}" data-day="${d.iso}">
+          <div class="td-name">${d.name}${d.isToday ? " · hoy" : ""}</div>
+          <select aria-label="${d.name}" onchange="TrainUI.setDay('${d.key}', this.value)">${optsFor(s.weeklyPlan[d.key])}</select>
+          ${r ? `<a class="tr-day-go" href="#/entrenar/sesion/${d.iso}">${esc(r.name)}</a>` : `<span class="tr-muted">—</span>`}
+          ${d.override ? `<button class="tr-textbtn" onclick="TrainUI.clearOv('${d.iso}')">Quitar cambio</button>` : ""}
+          <div class="tr-day-tools">
+            <input type="date" aria-label="Mover ${d.name}" onchange="if(this.value) TrainUI.moveDay('${d.iso}', this.value)">
+          </div>
         </div>`;
       }).join("")}</div>
-      <p class="tr-muted" style="margin-top:10px">El desplegable edita el plan recurrente. «Mover este día» crea una excepción (enfermedad, sesión perdida) y deja el plan base intacto.</p>
       <div class="caps-head">Rutinas</div>
       <div class="tr-list">${s.routines.length ? s.routines.map((r) =>
-        `<div class="tr-itemrow">
-          <div style="flex:1"><b><a href="#/entrenar/rutina/${esc(r.id)}">${esc(r.name)}</a></b>
+        `<a class="tr-itemrow" href="#/entrenar/rutina/${esc(r.id)}">
+          <div style="flex:1"><b>${esc(r.name)}</b>
             <div class="tr-muted">${r.items.length} ejercicios · ${Train.PROGRESSION_TYPES[r.progression?.type]?.name || "Lineal"}</div></div>
-          <a class="btn" href="#/entrenar/rutina/${esc(r.id)}">Editar</a>
-          <button class="btn" onclick="TrainUI.delRoutine('${esc(r.id)}')">Borrar</button>
-        </div>`).join("") : `<div class="tr-empty">No hay rutinas todavía.</div>`}</div>
+        </a>`).join("") : `<div class="tr-empty">Sin rutinas.</div>`}</div>
     `;
   }
 
@@ -177,24 +172,30 @@ const TrainUI = (() => {
     const progOpts = Object.keys(Train.PROGRESSION_TYPES).map((k) =>
       `<option value="${k}" ${r.progression?.type === k ? "selected" : ""}>${Train.PROGRESSION_TYPES[k].name}</option>`).join("");
     return `
-      <h2 class="section-title">${esc(r.name)}</h2>
-      <p class="section-sub">Añade ejercicios de la biblioteca o crea los tuyos. El mapa de la derecha muestra qué pega esta rutina.</p>
-      <div class="tr-row">
-        ${field("Nombre", `<input id="rn-name" value="${esc(r.name)}">`)}
-        ${field("Regla de progresión", `<select id="rn-prog">${progOpts}</select>`)}
-        ${field("Incremento (kg)", `<input id="rn-inc" type="number" step="0.5" value="${r.progression?.increment || s.settings.defaultIncrement}">`)}
-        ${field("Rango reps (doble)", `<input id="rn-min" type="number" value="${r.progression?.minReps || 8}" style="width:70px"> – <input id="rn-max" type="number" value="${r.progression?.maxReps || 12}" style="width:70px">`)}
-        <button class="btn primary" onclick="TrainUI.saveRoutineMeta('${esc(r.id)}')">Guardar regla</button>
+      <div class="tr-toolbar">
+        <h2 class="section-title" style="margin:0;flex:1">${esc(r.name)}</h2>
+        <button class="tr-textbtn" onclick="TrainUI.delRoutine('${esc(r.id)}')">Borrar</button>
       </div>
-      <p class="tr-muted">${esc(Train.PROGRESSION_TYPES[r.progression?.type]?.desc || "")}</p>
-      <div class="tr-actions">
-        <button class="btn primary" onclick="TrainUI.openPicker('${esc(r.id)}')">Añadir ejercicio</button>
-        <button class="btn" onclick="TrainUI.openCustom('${esc(r.id)}')">Ejercicio personalizado</button>
+      <div class="tr-split">
+        <div>
+          <div class="tr-row">
+            ${field("Nombre", `<input id="rn-name" value="${esc(r.name)}">`)}
+            ${field("Progresión", `<select id="rn-prog">${progOpts}</select>`)}
+            ${field("Incremento", `<input id="rn-inc" type="number" step="0.5" value="${r.progression?.increment || s.settings.defaultIncrement}">`)}
+            ${field("Rango", `<input id="rn-min" type="number" value="${r.progression?.minReps || 8}" style="width:70px"> – <input id="rn-max" type="number" value="${r.progression?.maxReps || 12}" style="width:70px">`)}
+            <button class="btn" onclick="TrainUI.saveRoutineMeta('${esc(r.id)}')">Guardar</button>
+          </div>
+          <div class="tr-actions">
+            <button class="btn primary" onclick="TrainUI.openPicker('${esc(r.id)}')">Añadir</button>
+            <button class="btn" onclick="TrainUI.openCustom('${esc(r.id)}')">El mío</button>
+          </div>
+          <div class="tr-list" style="margin-top:12px">${r.items.length ? r.items.map((it, i) => routineItemRow(r, it, i)).join("")
+            : `<div class="tr-empty">Vacía.</div>`}</div>
+        </div>
+        <aside class="tr-aside">
+          ${muscleMaps(preview, s.settings.bodyFigure)}
+        </aside>
       </div>
-      <div class="tr-list" style="margin-top:12px">${r.items.length ? r.items.map((it, i) => routineItemRow(r, it, i)).join("")
-        : `<div class="tr-empty">Rutina vacía. Añade ejercicios de la biblioteca (1.324 con GIF) o crea uno propio.</div>`}</div>
-      <div class="caps-head">Vista previa muscular</div>
-      ${muscleMaps(preview, s.settings.bodyFigure)}
     `;
   }
 
@@ -242,28 +243,32 @@ const TrainUI = (() => {
       const r = rid ? Train.getRoutine(rid) : null;
       const isToday = iso === Train.todayISO();
       return `
-        <h2 class="section-title">Sesión guiada</h2>
-        <p class="section-sub">${isToday ? "La app sabe qué día es y arranca la rutina de hoy." : "Sesión del " + Train.formatDateES(iso) + " (sin tocar el plan semanal)."} Primero pide el peso corporal; luego rellena los pesos de la última vez.</p>
-        <div class="tr-card">
-          <h3>${r ? esc(r.name) : (isToday ? "No hay rutina hoy" : "No hay rutina este día")}</h3>
-          <p class="tr-muted">${r ? r.items.length + " ejercicios preparados con objetivos ya calculados." : "Puedes entrenar en vacío, asignar una rutina al plan, o abrir otro día de la semana."}</p>
-          <div class="tr-actions">
-            <button class="btn primary" onclick="TrainUI.begin('${iso}')">${r ? (isToday ? "Empezar sesión de hoy" : "Empezar esta sesión") : "Sesión libre (vacía)"}</button>
-            <a class="btn" href="#/entrenar/plan">Cambiar el plan</a>
+        <div class="tr-hero">
+          <div class="tr-kicker">${isToday ? "Hoy" : Train.formatDateES(iso)}</div>
+          <h1>${r ? esc(r.name) : "Libre"}</h1>
+          <p>${r ? r.items.length + " ejercicios" : "Sin rutina este día."}</p>
+          <div class="tr-actions" style="margin-top:14px">
+            <button class="btn primary tr-cta" onclick="TrainUI.begin('${iso}')">${r ? "Empezar sesión" : "Sesión libre"}</button>
           </div>
         </div>`;
     }
     const effortOn = s.settings.effortScale !== "off";
     const items = ses.items || [];
     return `
-      <h2 class="section-title">${esc(ses.routineName)} · ${Train.formatDateES(ses.date)}</h2>
-      <p class="tr-muted">Peso de hoy: <b>${ses.bodyWeightKg != null ? Train.trimNum(ses.bodyWeightKg) + " kg" : "pendiente"}</b>
-        · Esfuerzo: ${effortOn ? s.settings.effortScale.toUpperCase() : "oculto"}</p>
-      ${!items.length ? `<div class="tr-empty">Sesión vacía. No hay ejercicios que registrar. Termina para no perder el tiempo de actividad, o añade ejercicios al plan.</div>` : ""}
+      <div class="tr-session-head">
+        <h2 class="section-title">${esc(ses.routineName)}</h2>
+        <span class="tr-muted">${Train.formatDateES(ses.date)}${ses.bodyWeightKg != null ? " · " + Train.trimNum(ses.bodyWeightKg) + " kg" : ""}</span>
+      </div>
+      ${!ses.bodyWeightAsked ? `<div class="tr-bwbar">
+        <label>Peso de hoy <input id="ses-bw-inline" type="number" step="0.1" value="${Train.getState().weighIns.slice(-1)[0]?.kg ?? ""}"></label>
+        <button class="btn primary" onclick="TrainUI.commitBW()">Listo</button>
+        <button class="tr-textbtn" onclick="TrainUI.skipBW()">Omitir</button>
+      </div>` : ""}
+      ${!items.length ? `<div class="tr-empty">Nada que registrar.</div>` : ""}
       <div class="tr-items">${items.map((it, ii) => sessionExercise(it, ii, effortOn, s.settings.effortScale)).join("")}</div>
-      <div class="tr-actions">
-        <button class="btn primary" onclick="TrainUI.finish()">Terminar y guardar</button>
-        <button class="btn" onclick="TrainUI.discard()">Descartar</button>
+      <div class="tr-actions tr-sticky-end">
+        <button class="btn primary" onclick="TrainUI.finish()">Terminar</button>
+        <button class="tr-textbtn" onclick="TrainUI.discard()">Descartar</button>
       </div>
       <div id="trTimers"></div>
     `;
@@ -279,7 +284,7 @@ const TrainUI = (() => {
     return `<div class="tr-ex ${it.supersetGroup ? "ss" : ""}">
       <div class="tr-ex-h">${media}
         <div class="tr-ex-meta">
-          <h4>${esc(it.name)} ${it.supersetGroup ? `<span class="tr-badge gold">Superserie · descanso solo al terminar el par</span>` : ""}</h4>
+          <h4>${esc(it.name)} ${it.supersetGroup ? `<span class="tr-badge gold">Superserie</span>` : ""}</h4>
           <div>${it.logType === "reps" && it.perSide ? `<span class="tr-badge">Por lado</span>` : ""}
             ${it.isBodyweight && !it.dipBelt ? `<span class="tr-badge">Sin peso</span>` : ""}
             ${it.dipBelt ? `<span class="tr-badge gold">Lastre</span>` : ""}
@@ -321,32 +326,28 @@ const TrainUI = (() => {
   function viewWeight() {
     const s = Train.getState();
     const goal = s.settings.bodyWeightGoal;
-    const segs = Train.chartSegments(s.weighIns, goal);
     const last = s.weighIns[s.weighIns.length - 1];
     return `
-      <h2 class="section-title">Peso corporal</h2>
-      <p class="section-sub">Gráfica interactiva con línea de objetivo. Las subidas y bajadas se colorean según te acercan o te alejan de esa meta.</p>
+      <h2 class="section-title">Peso</h2>
       <div class="tr-row">
-        ${field("Peso de hoy (kg)", `<input id="bw-kg" type="number" step="0.1" value="${last ? last.kg : 70}">`)}
+        ${field("kg", `<input id="bw-kg" type="number" step="0.1" value="${last ? last.kg : ""}">`)}
         ${field("Fecha", `<input id="bw-date" type="date" value="${Train.todayISO()}">`)}
-        ${field("Objetivo (kg)", `<input id="bw-goal" type="number" step="0.1" value="${goal ?? ""}" placeholder="Opcional">`)}
+        ${field("Objetivo", `<input id="bw-goal" type="number" step="0.1" value="${goal ?? ""}">`)}
         <button class="btn primary" onclick="TrainUI.saveWeight()">Guardar</button>
       </div>
       <div class="tr-card" style="margin-top:14px">
-        ${s.weighIns.length < 2 ? `<div class="tr-empty">Registra al menos dos pesajes para ver la evolución.${goal == null ? " Aún no hay objetivo: la línea se dibujará en color neutro." : ""}</div>` : weightChartSVG(s.weighIns, goal)}
-        <div class="tr-muted" style="margin-top:8px">Verde: te acercas al objetivo. Ámbar: te alejas. Sin objetivo, la curva usa el color de marca.</div>
+        ${s.weighIns.length < 2 ? `<div class="tr-empty">Aún no hay curva.</div>` : weightChartSVG(s.weighIns, goal)}
       </div>
-      <div class="caps-head">Historial</div>
-      <div class="tr-list">${s.weighIns.slice().reverse().map((w, i, arr) => {
+      <div class="tr-list" style="margin-top:12px">${s.weighIns.slice().reverse().map((w, i) => {
         const prev = s.weighIns[s.weighIns.length - 2 - i];
         const tone = prev ? Train.weighInTowardGoal(prev.kg, w.kg, goal) : "neutral";
         const cls = tone === "toward" ? "tr-toward" : tone === "away" ? "tr-away" : "";
         const delta = prev ? (w.kg - prev.kg) : 0;
         return `<div class="tr-itemrow"><div style="flex:1">${Train.formatDateES(w.date)}</div>
           <b>${Train.trimNum(w.kg)} kg</b>
-          <span class="${cls}">${prev ? ((delta > 0 ? "+" : "") + Train.trimNum(delta) + " kg") : "—"}</span>
-          <button class="btn" onclick="TrainUI.delWeight('${esc(w.id)}')">Borrar</button></div>`;
-      }).join("") || `<div class="tr-empty">Sin pesajes.</div>`}
+          <span class="${cls}">${prev ? ((delta > 0 ? "+" : "") + Train.trimNum(delta)) : ""}</span>
+          <button class="tr-textbtn" onclick="TrainUI.delWeight('${esc(w.id)}')">×</button></div>`;
+      }).join("")}
     `;
   }
 
@@ -385,39 +386,74 @@ const TrainUI = (() => {
     const prs = Train.exercisePRs(catalog);
     const hm = Train.heatmap(new Date().getFullYear());
     return `
-      <h2 class="section-title">PRs, estadísticas y evolución</h2>
-      <p class="section-sub">1RM estimado del mejor set elegible (máximo 12 reps). El esfuerzo RIR/RPE no entra en esta cuenta.</p>
+      <h2 class="section-title">PRs y 1RM</h2>
       <div class="tr-card">
-        <h3>Calculadora de 1RM (sets no hechos)</h3>
         <div class="tr-row">
-          ${field("Peso (kg)", `<input id="orm-w" type="number" value="${calc1.w}">`)}
+          ${field("Peso", `<input id="orm-w" type="number" value="${calc1.w}">`)}
           ${field("Reps", `<input id="orm-r" type="number" value="${calc1.r}">`)}
-          <button class="btn primary" onclick="TrainUI.calcORM()">Estimar</button>
+          <button class="btn primary" onclick="TrainUI.calcORM()">1RM</button>
         </div>
-        <div id="orm-out" class="tr-muted" style="margin-top:8px">No se estima por encima de 12 repeticiones.</div>
+        <div id="orm-out" class="tr-muted" style="margin-top:8px"></div>
       </div>
-      <div class="caps-head">Mejores 1RM</div>
-      <div class="tr-list">${prs.length ? prs.map((p) => `
+      <div class="tr-list" style="margin-top:14px">${prs.length ? prs.map((p) => `
         <div class="tr-itemrow">
           <div style="flex:1"><b>${esc(p.name)}</b>
-            <div class="tr-muted">Mejor set: ${esc(p.best.label)} · 1RM ≈ ${Train.trimNum(p.best.estimate)} kg</div>
+            <div class="tr-muted">${esc(p.best.label)} · ${Train.trimNum(p.best.estimate)} kg</div>
             ${p.history.length > 1 ? `<svg viewBox="0 0 160 36" width="160" height="36">${spark(p.history)}</svg>` : ""}
           </div>
-        </div>`).join("") : `<div class="tr-empty">Todavía no hay sets elegibles (1–12 reps con peso).</div>`}
-      <div class="caps-head">Mapa muscular</div>
-      <div class="tr-row">
-        ${["week", "month", "all"].map((k) => {
-          const lab = { week: "Semana", month: "Mes", all: "Todo el tiempo" }[k];
-          return `<button class="ex-filter ${period === k ? "active" : ""}" onclick="TrainUI.setPeriod('${k}')">${lab}</button>`;
-        }).join("")}
-        <span class="tr-muted">Figura: ${s.settings.bodyFigure === "female" ? "mujer" : "hombre"} (se cambia en Ajustes)</span>
-      </div>
-      ${muscleMaps(work, s.settings.bodyFigure)}
-      <p class="tr-muted">Sin trabajar en este periodo: ${work.unused.length ? work.unused.join(", ") : "ninguno"}.</p>
-      <div class="caps-head">Actividad ${hm.year}</div>
-      <p class="section-sub">Cada casilla es un día; el tono depende del tiempo entrenando.</p>
+        </div>`).join("") : `<div class="tr-empty">Sin marcas todavía.</div>`}
+      ${viewMuscleBlock(s, work, period)}
       ${heatmapHTML(hm)}
     `;
+  }
+
+  function viewProgress() {
+    const s = Train.getState();
+    const period = (typeof sessionStorage !== "undefined" && sessionStorage.getItem("hh-muscle-period")) || "week";
+    const range = Train.periodRange(period);
+    const work = Train.muscleWork(s.workouts, catalog, range.from, range.to);
+    const hm = Train.heatmap(new Date().getFullYear());
+    const prs = Train.exercisePRs(catalog);
+    const last = s.weighIns[s.weighIns.length - 1];
+    return `
+      <div class="tr-toolbar">
+        <h2 class="section-title" style="margin:0">Progreso</h2>
+        <a class="tr-textbtn" href="#/entrenar/peso">${last ? Train.trimNum(last.kg) + " kg" : "Peso"}</a>
+      </div>
+      ${viewMuscleBlock(s, work, period)}
+      ${prs.length ? `<div class="tr-prstrip">${prs.slice(0, 4).map((p) =>
+        `<div><b>${Train.trimNum(p.best.estimate)}</b><span>${esc(p.name)}</span></div>`).join("")}
+        <a href="#/entrenar/stats">1RM</a></div>` : ""}
+      ${heatmapHTML(hm)}
+    `;
+  }
+
+  function viewMuscleBlock(s, work, period) {
+    const rest = (work.unused || []).filter((n) => n !== "Sistema cardiovascular");
+    return `
+      <div class="tr-mapwrap">
+        <div class="tr-row tr-map-filters">
+          ${["week", "month", "all"].map((k) => {
+            const lab = { week: "Semana", month: "Mes", all: "Todo" }[k];
+            return `<button class="ex-filter ${period === k ? "active" : ""}" onclick="TrainUI.setPeriod('${k}')">${lab}</button>`;
+          }).join("")}
+        </div>
+        <div class="caps-head">Mapa muscular</div>
+        ${muscleMaps(work, s.settings.bodyFigure)}
+        ${rest.length ? `<div class="tr-resting">${rest.map((n) => `<span>${esc(n)}</span>`).join("")}</div>` : ""}
+      </div>`;
+  }
+
+  function viewMore() {
+    const items = [
+      ["#/entrenar/biblioteca", "Biblioteca", "1.324 ejercicios"],
+      ["#/entrenar/peso", "Peso", "Objetivo y curva"],
+      ["#/entrenar/stats", "Marcas", "1RM y PRs"],
+      ["#/entrenar/compartir", "Compartir", "Plan en JSON o PDF"],
+      ["#/entrenar/ajustes", "Ajustes", "Pantalla, esfuerzo, material"],
+    ];
+    return `<div class="tr-list">${items.map(([h, t, d]) =>
+      `<a class="tr-itemrow" href="${h}"><div style="flex:1"><b>${t}</b><div class="tr-muted">${d}</div></div></a>`).join("")}</div>`;
   }
 
   function spark(hist) {
@@ -447,70 +483,10 @@ const TrainUI = (() => {
   }
 
   function muscleMaps(work, figure) {
-    return `<div class="tr-maps">
-      <div class="tr-card"><h3>Frente</h3>${bodySVG("front", work, figure)}</div>
-      <div class="tr-card"><h3>Espalda</h3>${bodySVG("back", work, figure)}</div>
-    </div>`;
-  }
-
-  function shade(work, id) {
-    const max = work.max || 0;
-    const v = (work.scores && work.scores[id]) || 0;
-    if (!max || !v) return "var(--panel-2)";
-    const t = Math.min(1, v / max);
-    const a = (0.18 + t * 0.82).toFixed(2);
-    return `rgba(90,158,136,${a})`;
-  }
-
-  function bodySVG(side, work, figure) {
-    const f = figure === "female";
-    const hip = f ? 1.08 : 0.94;
-    const sh = f ? 0.92 : 1.06;
-    const fill = (id) => shade(work, id);
-    const title = (id) => {
-      const m = Train.MUSCLES.find((x) => x.id === id);
-      const v = work.scores[id] || 0;
-      return `${m ? m.es : id}: ${Math.round(v)}`;
-    };
-    if (side === "front") {
-      return `<svg class="tr-svg" viewBox="0 0 200 420">
-        <ellipse class="m" cx="100" cy="28" rx="${18 * sh}" ry="20" fill="${fill("neck")}"><title>${title("neck")}</title></ellipse>
-        <rect class="m" x="${100 - 16 * sh}" y="46" width="${32 * sh}" height="18" rx="4" fill="${fill("neck")}"><title>${title("neck")}</title></rect>
-        <ellipse class="m" cx="${58 * sh + 10}" cy="88" rx="${22 * sh}" ry="16" fill="${fill("delts")}"><title>${title("delts")}</title></ellipse>
-        <ellipse class="m" cx="${142 - (sh - 1) * 20}" cy="88" rx="${22 * sh}" ry="16" fill="${fill("delts")}"><title>${title("delts")}</title></ellipse>
-        <rect class="m" x="${72}" y="78" width="56" height="48" rx="8" fill="${fill("pectorals")}"><title>${title("pectorals")}</title></rect>
-        <rect class="m" x="${48}" y="100" width="18" height="46" rx="8" fill="${fill("biceps")}"><title>${title("biceps")}</title></rect>
-        <rect class="m" x="${134}" y="100" width="18" height="46" rx="8" fill="${fill("biceps")}"><title>${title("biceps")}</title></rect>
-        <rect class="m" x="${44}" y="144" width="14" height="40" rx="6" fill="${fill("forearms")}"><title>${title("forearms")}</title></rect>
-        <rect class="m" x="${142}" y="144" width="14" height="40" rx="6" fill="${fill("forearms")}"><title>${title("forearms")}</title></rect>
-        <rect class="m" x="78" y="128" width="44" height="46" rx="6" fill="${fill("abs")}"><title>${title("abs")}</title></rect>
-        <rect class="m" x="68" y="132" width="12" height="40" rx="4" fill="${fill("obliques")}"><title>${title("obliques")}</title></rect>
-        <rect class="m" x="120" y="132" width="12" height="40" rx="4" fill="${fill("obliques")}"><title>${title("obliques")}</title></rect>
-        <rect class="m" x="${88 - (hip - 1) * 8}" y="176" width="${24 * hip}" height="18" rx="6" fill="${fill("hip-flexors")}"><title>${title("hip-flexors")}</title></rect>
-        <rect class="m" x="${58}" y="196" width="${32 * hip}" height="90" rx="14" fill="${fill("quads")}"><title>${title("quads")}</title></rect>
-        <rect class="m" x="${110}" y="196" width="${32 * hip}" height="90" rx="14" fill="${fill("quads")}"><title>${title("quads")}</title></rect>
-        <rect class="m" x="86" y="210" width="28" height="50" rx="8" fill="${fill("adductors")}"><title>${title("adductors")}</title></rect>
-        <ellipse class="m" cx="100" cy="70" rx="22" ry="10" fill="${fill("cardio")}" opacity=".35"><title>${title("cardio")}</title></ellipse>
-      </svg>`;
+    if (typeof MuscleMapView !== "undefined" && MuscleMapView.mapsHTML) {
+      return MuscleMapView.mapsHTML(work, figure);
     }
-    return `<svg class="tr-svg" viewBox="0 0 200 420">
-      <ellipse class="m" cx="100" cy="28" rx="${18 * sh}" ry="20" fill="${fill("neck")}"><title>${title("neck")}</title></ellipse>
-      <rect class="m" x="74" y="50" width="52" height="22" rx="6" fill="${fill("traps")}"><title>${title("traps")}</title></rect>
-      <ellipse class="m" cx="58" cy="88" rx="${22 * sh}" ry="16" fill="${fill("delts")}"><title>${title("delts")}</title></ellipse>
-      <ellipse class="m" cx="142" cy="88" rx="${22 * sh}" ry="16" fill="${fill("delts")}"><title>${title("delts")}</title></ellipse>
-      <rect class="m" x="70" y="74" width="60" height="36" rx="8" fill="${fill("upper-back")}"><title>${title("upper-back")}</title></rect>
-      <path class="m" d="M70 108 L100 170 L130 108 Z" fill="${fill("lats")}"><title>${title("lats")}</title></path>
-      <rect class="m" x="82" y="150" width="36" height="28" rx="6" fill="${fill("lower-back")}"><title>${title("lower-back")}</title></rect>
-      <rect class="m" x="48" y="100" width="18" height="46" rx="8" fill="${fill("triceps")}"><title>${title("triceps")}</title></rect>
-      <rect class="m" x="134" y="100" width="18" height="46" rx="8" fill="${fill("triceps")}"><title>${title("triceps")}</title></rect>
-      <rect class="m" x="${70}" y="178" width="${60 * hip}" height="36" rx="12" fill="${fill("glutes")}"><title>${title("glutes")}</title></rect>
-      <rect class="m" x="58" y="216" width="32" height="80" rx="12" fill="${fill("hamstrings")}"><title>${title("hamstrings")}</title></rect>
-      <rect class="m" x="110" y="216" width="32" height="80" rx="12" fill="${fill("hamstrings")}"><title>${title("hamstrings")}</title></rect>
-      <rect class="m" x="62" y="300" width="26" height="50" rx="10" fill="${fill("calves")}"><title>${title("calves")}</title></rect>
-      <rect class="m" x="112" y="300" width="26" height="50" rx="10" fill="${fill("calves")}"><title>${title("calves")}</title></rect>
-      <rect class="m" x="46" y="148" width="14" height="36" rx="6" fill="${fill("forearms")}"><title>${title("forearms")}</title></rect>
-      <rect class="m" x="140" y="148" width="14" height="36" rx="6" fill="${fill("forearms")}"><title>${title("forearms")}</title></rect>
-    </svg>`;
+    return `<div class="tr-maps"><div class="tr-empty">Cargando mapa…</div></div>`;
   }
 
   function viewLibrary() {
@@ -525,7 +501,7 @@ const TrainUI = (() => {
     const chipsG = [{ id: "", n: "Todos" }].concat(Object.keys(Train.GROUP_ES).map((k) => ({ id: k, n: Train.GROUP_ES[k] })));
     return `
       <h2 class="section-title">Biblioteca de ejercicios</h2>
-      <p class="section-sub">${pool.length} ejercicios disponibles${owned.length ? " con tu material" : ""} · ${catalog.length} en el dataset Gym Visual con GIF. Las combinaciones de filtros siempre tienen resultados.</p>
+      <p class="section-sub">${pool.length} ejercicios${owned.length ? " · tu material" : ""}.</p>
       <div class="tr-row">
         ${field("Buscar", `<input id="lib-q" value="${esc(q)}" placeholder="nombre, músculo…" oninput="TrainUI.libQ(this.value)">`)}
       </div>
@@ -554,8 +530,7 @@ const TrainUI = (() => {
 
   function viewShare() {
     return `
-      <h2 class="section-title">Compartir un plan</h2>
-      <p class="section-sub">Exporta rutinas y el horario semanal en un archivo pequeño. No incluye entrenos ni pesajes. Importar hace un <b>merge</b>: nunca pisa el plan que ya tienes.</p>
+      <h2 class="section-title">Compartir</h2>
       <div class="tr-actions">
         <button class="btn primary" onclick="TrainUI.downloadPlan()">Descargar JSON</button>
         <button class="btn" onclick="TrainUI.printPlan()">Imprimir / PDF limpio</button>
@@ -617,7 +592,6 @@ const TrainUI = (() => {
     if (s.activeSession) {
       await setWake(true);
       drawTimers();
-      if (!s.activeSession.bodyWeightAsked) askBodyWeight();
     } else {
       await setWake(false);
     }
@@ -648,6 +622,11 @@ const TrainUI = (() => {
 
   function setDay(key, id) { Train.assignDay(key, id || null); refresh(); }
   function clearOv(iso) { Train.clearOverride(iso); refresh(); }
+  function moveDay(fromISO, toISO) {
+    if (!toISO || fromISO === toISO) return;
+    Train.reschedule(fromISO, toISO);
+    refresh();
+  }
 
   function askReschedule(fromISO) {
     const to = prompt("Mover el entreno del " + fromISO + " a (AAAA-MM-DD). El plan semanal base no cambia.", Train.todayISO());
@@ -811,33 +790,18 @@ const TrainUI = (() => {
     location.hash = "#/entrenar/sesion";
   }
 
-  function askBodyWeight() {
-    if (document.getElementById("tr-bw-modal")) return;
-    const last = Train.getState().weighIns.slice(-1)[0];
-    const box = document.createElement("div");
-    box.id = "tr-bw-modal";
-    box.className = "tr-modal-bg";
-    box.innerHTML = `<div class="tr-modal">
-      <h3>Peso corporal de hoy</h3>
-      <p class="tr-muted">Se pide al empezar la sesión. También queda en tu gráfica de peso.</p>
-      <div class="tr-row">${field("kg", `<input id="ses-bw" type="number" step="0.1" value="${last ? last.kg : ""}">`)}
-        <button class="btn primary" id="ses-bw-ok">Continuar</button>
-        <button class="btn" id="ses-bw-skip">Omitir</button></div>
-    </div>`;
-    document.body.appendChild(box);
-    const done = (kg) => {
-      Train.patchSession((ses) => {
-        ses.bodyWeightAsked = true;
-        ses.bodyWeightKg = kg;
-      });
-      box.remove();
-      refresh();
-    };
-    box.querySelector("#ses-bw-ok").onclick = () => {
-      const v = document.getElementById("ses-bw").value;
-      done(v === "" ? null : +v);
-    };
-    box.querySelector("#ses-bw-skip").onclick = () => done(null);
+  function commitBW() {
+    const el = document.getElementById("ses-bw-inline");
+    const v = el && el.value;
+    Train.patchSession((ses) => {
+      ses.bodyWeightAsked = true;
+      ses.bodyWeightKg = v === "" || v == null ? null : +v;
+    });
+    refresh();
+  }
+  function skipBW() {
+    Train.patchSession((ses) => { ses.bodyWeightAsked = true; ses.bodyWeightKg = null; });
+    refresh();
   }
 
   function setCell(ii, si, key, val) {
@@ -1080,11 +1044,11 @@ const TrainUI = (() => {
   }
 
   return {
-    render, mount, setDay, clearOv, askReschedule, newRoutine, seedTemplate, delRoutine,
+    render, mount, setDay, clearOv, moveDay, askReschedule, newRoutine, seedTemplate, delRoutine,
     saveRoutineMeta, patchItem, setItemRule, makeSS, breakSS, removeItem, openPicker, openCustom,
     begin, freeSession, setCell, stepRep, toggleSet, toggleWork, skipRest, finish, discard,
     saveWeight, delWeight, calcORM, setPeriod, libQ, libG, libEq, setSet, toggleEquip,
-    downloadPlan, printPlan, importPlan, muscleMaps, catalogSize: () => catalog.length,
+    downloadPlan, printPlan, importPlan, muscleMaps, commitBW, skipBW, catalogSize: () => catalog.length,
   };
 })();
 if (typeof globalThis !== "undefined") globalThis.TrainUI = TrainUI;
