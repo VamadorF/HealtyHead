@@ -704,13 +704,13 @@ async function loadEjercicios() {
   if (!box) return;
   box.innerHTML = `<div class="loader"><div class="spin"></div><div style="margin-top:10px">Cargando ejercicios…</div></div>`;
   try {
-    const params = new URLSearchParams({ catalog: "1", limit: "48" });
-    if (exState.grupo) params.set("grupo", exState.grupo);
-    if (exState.q) params.set("q", exState.q);
-    if (exState.equipo.length) params.set("equipo", exState.equipo.join(","));
-    const res = await fetch(`${API.gym}?${params.toString()}`);
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
+    const data = await GymCatalog.fetchGym({
+      catalog: "1",
+      limit: "48",
+      grupo: exState.grupo,
+      q: exState.q,
+      equipo: exState.equipo.join(","),
+    });
     const items = data.items || [];
     const eqBar = document.getElementById("exEquip");
     if (eqBar) {
@@ -734,7 +734,7 @@ async function loadEjercicios() {
     initReveal();
   } catch (err) {
     box.innerHTML = `<div class="notfound"><h3 class="font-head" style="margin:0 0 8px">No se pudieron cargar los ejercicios</h3>
-      <p style="color:var(--text-dim)">Ejecuta el proyecto con <b>python server.py</b> para habilitar la biblioteca (sirve el dataset local de ejercicios).</p>
+      <p style="color:var(--text-dim)">El dataset local no está disponible. Recarga la página; en un hosting estático debería servirse <b>data/gym_exercises.json</b>.</p>
       <p class="api-note">Detalle técnico: ${err.message}</p></div>`;
   }
 }

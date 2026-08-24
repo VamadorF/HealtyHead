@@ -18,19 +18,18 @@ const TrainUI = (() => {
 
   async function ensureCatalog() {
     if (catalog.length) return catalog;
-    try {
-      const r = await fetch("/api/gym?catalog=1&limit=1400");
-      if (r.ok) {
-        const data = await r.json();
-        catalog = data.items || [];
-      }
-    } catch (e) { /* fallback abajo */ }
-    if (!catalog.length) {
+    if (typeof GymCatalog !== "undefined" && GymCatalog.loadAll) {
       try {
-        const r = await fetch("data/gym_exercises.json");
-        if (r.ok) catalog = await r.json();
-      } catch (e2) { catalog = []; }
+        catalog = await GymCatalog.loadAll();
+      } catch (e) {
+        catalog = [];
+      }
+      return catalog;
     }
+    try {
+      const r = await fetch("data/gym_exercises.json");
+      if (r.ok) catalog = await r.json();
+    } catch (e2) { catalog = []; }
     return catalog;
   }
 

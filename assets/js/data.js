@@ -8,13 +8,13 @@
    ============================================================ */
 
 const API = {
-  // Proxy local (server.py) — mismo origen, sin problemas de CORS.
+  // Proxy (server.py en local, funciones serverless en Vercel) — mismo origen, sin CORS.
   base: "/api/recomendaciones",
   // Enlace directo a la API oficial, para el fallback y para "abrir en health.gov".
   directo: "https://odphp.health.gov/myhealthfinder/api/v4/myhealthfinder.json",
-  // Biblioteca de ejercicios (dataset Gym Visual) servida por el proxy local.
+  // Biblioteca de ejercicios. El cliente carga data/gym_exercises.json; /api/gym es opcional.
   gym: "/api/gym",
-  // Noticias de investigación (RSS de ScienceDaily) vía proxy local.
+  // Noticias de investigación (RSS) vía proxy (server.py o /api/noticias en Vercel).
   noticias: "/api/noticias",
 };
 
