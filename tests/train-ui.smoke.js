@@ -123,7 +123,7 @@ function get(url) {
   screens.forEach((parts) => {
     const html = TrainUI.render(parts);
     assert.ok(html && html.length > 80, "vista vacía " + parts.join("/"));
-    assert.ok(html.indexOf("undefined") < 0 || html.indexOf("undefined") > 0, "check");
+    assert.ok(html.indexOf("undefined") < 0, "undefined leak en " + parts.join("/"));
     assert.ok(!/\[object Object\]/.test(html), "object leak en " + parts.join("/"));
   });
 

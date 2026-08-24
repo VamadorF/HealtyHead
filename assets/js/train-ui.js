@@ -123,7 +123,7 @@ const TrainUI = (() => {
       return `<div class="tr-day ${d.isToday ? "today" : ""} ${vacated ? "vacated" : ""}">
         <div class="td-name">${d.name}${d.isToday ? " · hoy" : ""}</div>
         <div class="td-iso">${Train.formatDateES(d.iso)}</div>
-        <div>${r ? `<b>${esc(r.name)}</b>` : "<span class='tr-muted'>Descanso</span>"}</div>
+        <div>${r ? `<b><a href="#/entrenar/sesion/${d.iso}">${esc(r.name)}</a></b>` : "<span class='tr-muted'>Descanso</span>"}</div>
         ${moved ? `<div class="tr-moved">Movido desde ${Train.formatDateES(d.override.from)}</div>` : ""}
         ${vacated ? `<div class="tr-moved">Reprogramado a ${Train.formatDateES(d.override.to)}</div>` : ""}
       </div>`;
@@ -153,6 +153,7 @@ const TrainUI = (() => {
           <div>${r ? `<a href="#/entrenar/rutina/${esc(d.routineId)}">${esc(r.name)}</a>` : "<span class='tr-muted'>Sin sesión</span>"}</div>
           ${d.override ? `<div class="tr-moved">${d.override.vacated ? "Vacío (movido)" : "Excepción este día"}</div>
             <button class="btn" onclick="TrainUI.clearOv('${d.iso}')">Quitar excepción</button>` : ""}
+          ${r ? `<button class="btn primary" onclick="TrainUI.begin('${d.iso}')">${d.isToday ? "Entrenar hoy" : "Entrenar este día"}</button>` : ""}
           <button class="btn" onclick="TrainUI.askReschedule('${d.iso}')">Mover este día</button>
         </div>`;
       }).join("")}</div>
@@ -239,14 +240,15 @@ const TrainUI = (() => {
     if (!ses) {
       const rid = Train.scheduledRoutineId(iso);
       const r = rid ? Train.getRoutine(rid) : null;
+      const isToday = iso === Train.todayISO();
       return `
         <h2 class="section-title">Sesión guiada</h2>
-        <p class="section-sub">La app sabe qué día es y arranca la rutina de hoy. Primero pide el peso corporal; luego rellena los pesos de la última vez.</p>
+        <p class="section-sub">${isToday ? "La app sabe qué día es y arranca la rutina de hoy." : "Sesión del " + Train.formatDateES(iso) + " (sin tocar el plan semanal)."} Primero pide el peso corporal; luego rellena los pesos de la última vez.</p>
         <div class="tr-card">
-          <h3>${r ? esc(r.name) : "No hay rutina hoy"}</h3>
-          <p class="tr-muted">${r ? r.items.length + " ejercicios preparados con objetivos ya calculados." : "Puedes entrenar en vacío o asignar una rutina al plan."}</p>
+          <h3>${r ? esc(r.name) : (isToday ? "No hay rutina hoy" : "No hay rutina este día")}</h3>
+          <p class="tr-muted">${r ? r.items.length + " ejercicios preparados con objetivos ya calculados." : "Puedes entrenar en vacío, asignar una rutina al plan, o abrir otro día de la semana."}</p>
           <div class="tr-actions">
-            <button class="btn primary" onclick="TrainUI.begin('${iso}')">${r ? "Empezar sesión" : "Sesión libre (vacía)"}</button>
+            <button class="btn primary" onclick="TrainUI.begin('${iso}')">${r ? (isToday ? "Empezar sesión de hoy" : "Empezar esta sesión") : "Sesión libre (vacía)"}</button>
             <a class="btn" href="#/entrenar/plan">Cambiar el plan</a>
           </div>
         </div>`;
@@ -264,7 +266,6 @@ const TrainUI = (() => {
         <button class="btn" onclick="TrainUI.discard()">Descartar</button>
       </div>
       <div id="trTimers"></div>
-      ${ses.finishedPreview ? "" : ""}
     `;
   }
 
@@ -593,7 +594,8 @@ const TrainUI = (() => {
         </div>
         ${field("Objetivo de peso (kg)", `<input type="number" step="0.1" value="${s.bodyWeightGoal ?? ""}" onchange="TrainUI.setSet({bodyWeightGoal:this.value===''?null:+this.value})">`)}
         ${field("Techo de reps a peso corporal", `<input type="number" value="${s.bwRepCeiling}" onchange="TrainUI.setSet({bwRepCeiling:+this.value})">`)}
-        <p class="tr-muted">Al superar este techo se añade una serie en vez de una repetición, hasta que el consejo honesto es lastre o una variación más difícil.</p>
+        ${field("Máximo de series a peso corporal", `<input type="number" value="${s.bwMaxSets}" onchange="TrainUI.setSet({bwMaxSets:+this.value})">`)}
+        <p class="tr-muted">Al superar el techo de reps se añade una serie en vez de una repetición, hasta este máximo. Después el consejo honesto es lastre o una variación más difícil.</p>
         ${field("Incremento por defecto (kg)", `<input type="number" step="0.5" value="${s.defaultIncrement}" onchange="TrainUI.setSet({defaultIncrement:+this.value})">`)}
         ${field("Descanso por defecto (s)", `<input type="number" value="${s.defaultRest}" onchange="TrainUI.setSet({defaultRest:+this.value})">`)}
       </div>

@@ -315,6 +315,80 @@ test("sesión guiada pide peso, rellena último peso y detecta vacío", () => {
   assert.strictEqual(empty.items.length, 0);
 });
 
+test("terminar sesión recuerda el objetivo: doble progresión y tiempo suben de verdad", () => {
+  const catalog = [
+    { id: "lg", name: "barbell lunge", equipo: "barbell", grupo: "upper legs", target: "quads" },
+    { id: "pl", name: "front plank", equipo: "body weight", grupo: "waist", target: "abs" },
+  ];
+  const lunge = Train.makeRoutineItem(catalog[0], { targetReps: 8, targetSets: 3 });
+  const plank = Train.makeRoutineItem(catalog[1], { targetTime: 30, targetSets: 2 });
+  const r = Train.upsertRoutine({
+    name: "Mix",
+    progression: { type: "double", increment: 2.5, minReps: 8, maxReps: 12, timeIncrement: 5 },
+    items: [lunge, plank],
+  });
+  Train.assignDay("mon", r.id);
+  const ses1 = Train.startSession("2026-08-24", catalog);
+  ses1.items[0].sets.forEach((st) => { st.weight = 20; st.reps = 8; st.completed = true; });
+  ses1.items[1].sets.forEach((st) => { st.timeSec = 30; st.completed = true; });
+  Train.finishSession();
+  const stored = Train.getRoutine(r.id);
+  assert.strictEqual(stored.items[0].lastTargetReps, 8);
+  assert.strictEqual(stored.items[1].lastTargetTime, 30);
+  const ses2 = Train.startSession("2026-08-31", catalog);
+  assert.strictEqual(ses2.items[0].target.reps, 10);
+  assert.strictEqual(ses2.items[1].target.timeSec, 35);
+});
+
+test("plantilla full body no se duplica al aplicarla dos veces", () => {
+  const catalog = [
+    { id: "0043", name: "barbell full squat", equipo: "barbell", grupo: "upper legs", target: "quads" },
+    { id: "0025", name: "barbell bench press", equipo: "barbell", grupo: "chest", target: "pectorals" },
+    { id: "0662", name: "push-up", equipo: "body weight", grupo: "chest", target: "pectorals" },
+    { id: "2135", name: "weighted front plank", equipo: "weighted", grupo: "waist", target: "abs" },
+    { id: "0032", name: "barbell deadlift", equipo: "barbell", grupo: "back", target: "glutes" },
+    { id: "0027", name: "barbell bent over row", equipo: "barbell", grupo: "back", target: "lats" },
+    { id: "0652", name: "pull-up", equipo: "body weight", grupo: "back", target: "lats" },
+    { id: "0054", name: "barbell lunge", equipo: "barbell", grupo: "upper legs", target: "quads" },
+  ];
+  Train.applyTemplate("fullbody", catalog);
+  Train.applyTemplate("fullbody", catalog);
+  const named = Train.getState().routines.filter((r) => r.name === "Full body A" || r.name === "Full body B");
+  assert.strictEqual(named.length, 2);
+});
+
+test("excepciones de más de 8 semanas se podan", () => {
+  const r = Train.upsertRoutine({ name: "Push" });
+  const now = new Date();
+  const old = new Date(now);
+  old.setDate(old.getDate() - 70);
+  const recent = new Date(now);
+  recent.setDate(recent.getDate() - 10);
+  const oldIso = Train.todayISO(old);
+  const recentIso = Train.todayISO(recent);
+  Train.getState().overrides[oldIso] = { routineId: r.id };
+  Train.getState().overrides[recentIso] = { routineId: r.id };
+  Train.save();
+  assert.strictEqual(Train.getState().overrides[oldIso], undefined);
+  assert.ok(Train.getState().overrides[recentIso]);
+});
+
+test("merge remapea id colisionante si el nombre es distinto", () => {
+  const keep = Train.upsertRoutine({ name: "La mía" });
+  const payload = {
+    type: Train.PLAN_EXPORT_TYPE,
+    weeklyPlan: { wed: keep.id },
+    routines: [{ id: keep.id, name: "Ajena distinta", items: [], progression: { type: "linear" } }],
+    customExercises: [],
+  };
+  const added = Train.mergePlan(payload);
+  assert.strictEqual(added.routines, 1);
+  assert.strictEqual(Train.getState().routines.filter((x) => x.id === keep.id).length, 1);
+  assert.ok(Train.getState().routines.some((x) => x.name === "Ajena distinta" && x.id !== keep.id));
+  assert.ok(Train.getState().weeklyPlan.wed);
+  assert.notStrictEqual(Train.getState().weeklyPlan.wed, keep.id);
+});
+
 test("per-side: total par y etiqueta por lado", () => {
   assert.strictEqual(Train.applyPerSide(7, true), 8);
   assert.strictEqual(Train.nextEven(9), 10);

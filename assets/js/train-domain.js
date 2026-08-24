@@ -196,9 +196,23 @@
     return state;
   }
 
+  function pruneOverrides(s) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 56);
+    const cut = todayISO(cutoff);
+    Object.keys(s.overrides || {}).forEach((iso) => {
+      if (iso < cut) delete s.overrides[iso];
+    });
+  }
+
   function save() {
     if (!state) state = defaultState();
-    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    pruneOverrides(state);
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      /* cuota de localStorage o modo privado: el estado sigue en memoria */
+    }
     return state;
   }
 
@@ -324,6 +338,9 @@
           workoutId: w.id,
           sets: (it.sets || []).map((s) => Object.assign({ date: w.date }, s)),
           dipBelt: !!it.dipBelt,
+          targetReps: it.targetReps,
+          targetTime: it.targetTime,
+          targetSets: it.targetSets,
         });
       });
     });
@@ -546,7 +563,7 @@
     const item = opts.item;
     const step = Number(rule.timeIncrement) || 5;
     const targetSets = item.targetSets || 3;
-    const target = item.targetTime || 30;
+    const target = item.lastTargetTime || item.targetTime || 30;
     if (!last) {
       return {
         weight: item.seedWeight || (item.isBodyweight && !item.dipBelt ? 0 : null),
@@ -614,15 +631,9 @@
         weight: 0,
         reps: targetThen,
         sets: lastSets,
-        reason: "No llegaste a " + targetThen + (perSide ? " reps totales (" + (targetThen / 2) + " por lado)" : " reps") + " el " + formatDateES(last.date) + ". Se mantienen las reps; un fallo no progresa.",
-      };
-    }
-    if (fails >= 2) {
-      return {
-        weight: 0,
-        reps: targetThen,
-        sets: lastSets,
-        reason: "Estancamiento: se mantiene el objetivo. En peso corporal no se inventa carga.",
+        reason: fails >= 2
+          ? "Estancamiento: se mantiene el objetivo. En peso corporal no se inventa carga."
+          : "No llegaste a " + targetThen + (perSide ? " reps totales (" + (targetThen / 2) + " por lado)" : " reps") + " el " + formatDateES(last.date) + ". Se mantienen las reps; un fallo no progresa.",
       };
     }
     const nextReps = applyPerSide(targetThen + (perSide ? 2 : 1), perSide);
@@ -654,8 +665,14 @@
   function computeTarget(item, routine, workouts, settings) {
     const logs = lastLogsForExercise(item.exerciseId, workouts);
     const last = lastCompletedSets(item.exerciseId, workouts);
-    const rule = ruleOf(item, routine, settings);
-    const opts = { item: item, routine: routine, rule: rule, last: last, logs: logs, settings: settings };
+    const lastLog = logs.length ? logs[logs.length - 1] : null;
+    const remembered = Object.assign({}, item, {
+      lastTargetReps: item.lastTargetReps != null ? item.lastTargetReps : (lastLog && lastLog.targetReps),
+      lastTargetTime: item.lastTargetTime != null ? item.lastTargetTime : (lastLog && lastLog.targetTime),
+      lastTargetSets: item.lastTargetSets != null ? item.lastTargetSets : (lastLog && lastLog.targetSets),
+    });
+    const rule = ruleOf(remembered, routine, settings);
+    const opts = { item: remembered, routine: routine, rule: rule, last: last, logs: logs, settings: settings };
     let result;
     if (item.logType === "cardio") {
       const lastCardio = last && last.sets[0];
@@ -1020,12 +1037,26 @@
     return s.activeSession;
   }
 
+  function rememberSessionTargets(ses) {
+    if (!ses || !ses.routineId) return;
+    const routine = getRoutine(ses.routineId);
+    if (!routine) return;
+    (ses.items || []).forEach((it) => {
+      const row = routine.items.find((x) => x.id === it.id || x.exerciseId === it.exerciseId);
+      if (!row || !it.target) return;
+      if (it.target.reps != null) row.lastTargetReps = it.target.reps;
+      if (it.target.timeSec != null) row.lastTargetTime = it.target.timeSec;
+      if (it.target.sets != null) row.lastTargetSets = it.target.sets;
+    });
+  }
+
   function finishSession() {
     const s = getState();
     const ses = s.activeSession;
     if (!ses) return null;
     ses.finishedAt = Date.now();
     const durationSec = Math.max(0, Math.round((ses.finishedAt - ses.startedAt) / 1000));
+    rememberSessionTargets(ses);
     const workout = {
       id: ses.id,
       date: ses.date,
@@ -1041,6 +1072,9 @@
         logType: it.logType,
         dipBelt: it.dipBelt,
         perSide: it.perSide,
+        targetReps: it.target && it.target.reps != null ? it.target.reps : null,
+        targetTime: it.target && it.target.timeSec != null ? it.target.timeSec : null,
+        targetSets: it.target && it.target.sets != null ? it.target.sets : null,
         sets: (it.sets || []).filter((x) => x.completed).map((x) => ({
           weight: x.weight === "" ? null : Number(x.weight),
           reps: x.reps === "" ? null : Number(x.reps),
@@ -1216,8 +1250,8 @@
       added.custom += 1;
     });
     (incoming.routines || []).forEach((r) => {
-      const exists = s.routines.some((x) => x.id === r.id || x.name.toLowerCase() === String(r.name || "").toLowerCase());
-      if (exists) return;
+      const nameKey = String(r.name || "").toLowerCase();
+      if (s.routines.some((x) => x.name.toLowerCase() === nameKey)) return;
       const copy = clone(r);
       if (s.routines.some((x) => x.id === copy.id)) {
         const nid = uid("r");
@@ -1244,6 +1278,15 @@
   function applyTemplate(name, catalog) {
     const s = getState();
     if (name === "fullbody") {
+      const existingA = s.routines.find((r) => r.name === "Full body A");
+      const existingB = s.routines.find((r) => r.name === "Full body B");
+      if (existingA && existingB) {
+        if (!s.weeklyPlan.mon) s.weeklyPlan.mon = existingA.id;
+        if (!s.weeklyPlan.wed) s.weeklyPlan.wed = existingB.id;
+        if (!s.weeklyPlan.fri) s.weeklyPlan.fri = existingA.id;
+        save();
+        return [existingA, existingB];
+      }
       const byId = {};
       (catalog || []).forEach((e) => { byId[e.id] = e; });
       const add = (routine, ids) => {
@@ -1393,6 +1436,8 @@
     patchSession: patchSession,
     finishSession: finishSession,
     discardSession: discardSession,
+    rememberSessionTargets: rememberSessionTargets,
+    pruneOverrides: pruneOverrides,
     heatmap: heatmap,
     muscleWork: muscleWork,
     routinePreviewMuscles: routinePreviewMuscles,
